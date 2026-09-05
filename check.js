@@ -1,0 +1,1 @@
+const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); async function main() { try { const u = await prisma.usuario.findMany(); console.log('Usuarios:', u.length, u[0]?.email); const e = await prisma.eleitor.count(); console.log('Eleitores:', e); } catch(e) { console.error(e.message); } finally { await prisma.$disconnect(); } } main();

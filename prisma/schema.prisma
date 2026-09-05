@@ -1,0 +1,358 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Plano {
+  id              String   @id @default(uuid()) @db.Uuid
+  nome            String   // Ex: "Básico", "Pro", "Premium"
+  valor           Float    // Ex: 97.00
+  limiteEleitores Int      @default(1000) @map("limite_eleitores")
+  limiteUsuarios  Int      @default(3) @map("limite_usuarios")
+
+  contas          Conta[]
+
+  @@map("planos")
+}
+
+model PagamentoMensalidade {
+  id              String   @id @default(uuid()) @db.Uuid
+  contaId         String   @db.Uuid @map("conta_id")
+  conta           Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  valor           Float
+  dataVencimento  DateTime @map("data_vencimento")
+  dataPagamento   DateTime? @map("data_pagamento")
+  status          String   @default("PENDENTE") // "PAGO", "PENDENTE", "ATRASADO"
+
+  criadoEm        DateTime @default(now()) @map("criado_em")
+
+  @@map("pagamentos_mensalidade")
+}
+
+model Conta {
+  id             String   @id @default(uuid()) @db.Uuid
+  nome           String   // Nome da campanha/candidato
+  slug           String   @unique
+  status         String   @default("ATIVO") // "ATIVO", "BLOQUEADO", "INADIMPLENTE"
+
+  planoId        String?  @db.Uuid @map("plano_id")
+  plano          Plano?   @relation(fields: [planoId], references: [id], onDelete: SetNull)
+  diaVencimento  Int      @default(10) @map("dia_vencimento") // Dia do mês que vence
+  dataProximoVencimento DateTime? @map("data_proximo_vencimento") // Controle do Cronômetro
+
+  criadoEm       DateTime @default(now()) @map("criado_em")
+  atualizadoEm   DateTime @updatedAt @map("atualizado_em")
+
+  // Relacionamentos Inversos
+  usuarios       Usuario[]
+  eleitores      Eleitor[]
+  cidades        Cidade[]
+  bairros        Bairro[]
+  etiquetas      Etiqueta[]
+  metas          MetaCampanha[]
+  disparos       Disparo[]
+  formularios    Formulario[]
+  listas         ListaTransmissao[]
+  templates      CorrespondenciaTemplate[]
+  pagamentos     PagamentoMensalidade[]
+
+  @@map("contas")
+}
+
+model Usuario {
+  id           String   @id @default(uuid()) @db.Uuid
+  nome         String
+  email        String   @unique
+  senha        String   // Hash da senha
+  role         String   @default("ADMIN") // "ADMIN", "ASSISTENTE"
+  fotoPerfil   String?  @db.Text
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  contaId      String?  @db.Uuid @map("conta_id")
+  conta        Conta?   @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@map("usuarios")
+}
+
+model Eleitor {
+  id            String            @id @default(uuid()) @db.Uuid
+  nomeCompleto  String            @map("nome_completo")
+  telefone      String            // Celular/WhatsApp principal
+  logradouro    String?           // Nome da rua/avenida
+  numero        String?           // Número da casa/apto
+  bairroId      String            @db.Uuid @map("bairro_id")
+  bairro        Bairro            @relation(fields: [bairroId], references: [id], onDelete: Restrict)
+  cidadeId      String            @db.Uuid @map("cidade_id")
+  cidade        Cidade            @relation(fields: [cidadeId], references: [id], onDelete: Restrict)
+  dataNascimento DateTime?        @map("data_nascimento") // Data de nascimento
+  temperatura   Int               @default(1) // Escala de 1 a 5
+  criadoEm      DateTime          @default(now()) @map("criado_em")
+  atualizadoEm  DateTime          @updatedAt @map("atualizado_em")
+
+  // Relacionamentos
+  etiquetas     EleitorEtiqueta[]
+  listasTransmissao ListaTransmissaoEleitor[]
+
+  // Novos campos para Autorrelação de Liderança
+  isLider       Boolean           @default(false) @map("is_lider")
+  liderId       String?           @db.Uuid @map("lider_id")
+  lider         Eleitor?          @relation("Lideranca", fields: [liderId], references: [id], onDelete: SetNull)
+  indicados     Eleitor[]         @relation("Lideranca")
+
+  // Mala Direta Logs
+  disparoLogs   DisparoLog[]
+
+  // Relação com Formulário de Origem
+  formularioId  String?           @db.Uuid @map("formulario_id")
+  formulario    Formulario?       @relation("FormularioEleitores", fields: [formularioId], references: [id], onDelete: SetNull)
+
+  // Histórico de atualizações do eleitor
+  historicos    HistoricoEleitor[]
+
+  // Formulários criados onde este eleitor é o Líder padrão
+  formulariosCriados Formulario[]  @relation("FormularioLider")
+
+  contaId       String?           @db.Uuid @map("conta_id")
+  conta         Conta?            @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@unique([telefone, contaId])
+  @@map("eleitores")
+  @@index([bairroId])
+  @@index([temperatura])
+  @@index([isLider])
+  @@index([formularioId])
+}
+
+model HistoricoEleitor {
+  id          String   @id @default(uuid()) @db.Uuid
+  eleitorId   String   @map("eleitor_id") @db.Uuid
+  eleitor     Eleitor  @relation(fields: [eleitorId], references: [id], onDelete: Cascade)
+  tipo        String   // "CRIACAO", "ATUALIZACAO"
+  descricao   String   // "Cadastrado via formulário XYZ", "Etiqueta X adicionada", etc.
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  @@index([eleitorId])
+  @@map("historico_eleitores")
+}
+
+model Cidade {
+  id           String    @id @default(uuid()) @db.Uuid
+  nome         String
+  bairros      Bairro[]
+  eleitores    Eleitor[]
+  formularios  Formulario[]
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+
+  contaId      String?   @db.Uuid @map("conta_id")
+  conta        Conta?    @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@unique([nome, contaId])
+  @@map("cidades")
+}
+
+model Bairro {
+  id           String    @id @default(uuid()) @db.Uuid
+  nome         String
+  cidadeId     String    @db.Uuid @map("cidade_id")
+  cidade       Cidade    @relation(fields: [cidadeId], references: [id], onDelete: Cascade)
+  eleitores    Eleitor[]
+  formularios  Formulario[]
+  listasTransmissao ListaTransmissao[]
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+
+  contaId      String?   @db.Uuid @map("conta_id")
+  conta        Conta?    @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@unique([nome, cidadeId, contaId])
+  @@index([cidadeId])
+  @@map("bairros")
+}
+
+model Etiqueta {
+  id           String            @id @default(uuid()) @db.Uuid
+  nome         String            // Ex: "Evento Centro", "Liderança Esportiva"
+  categoria    String            // Ex: "Bairro", "Evento", "Profissão"
+  cor          String            // Hexadecimal para a tag (ex: "#EF4444")
+
+  // Relacionamentos
+  eleitores    EleitorEtiqueta[]
+  formularios  FormularioEtiqueta[]
+  listasTransmissao ListaTransmissaoEtiqueta[]
+
+  contaId      String?           @db.Uuid @map("conta_id")
+  conta        Conta?            @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@map("etiquetas")
+}
+
+model EleitorEtiqueta {
+  eleitorId   String   @map("eleitor_id") @db.Uuid
+  etiquetaId  String   @map("etiqueta_id") @db.Uuid
+  atribuidoEm DateTime @default(now()) @map("atribuido_em")
+
+  // Chaves estrangeiras
+  eleitor     Eleitor  @relation(fields: [eleitorId], references: [id], onDelete: Cascade)
+  etiqueta    Etiqueta @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+
+  @@id([eleitorId, etiquetaId])
+  @@map("eleitor_etiquetas")
+}
+
+model MetaCampanha {
+  id          String   @id @default(uuid()) @db.Uuid
+  cargoRegiao String   @map("cargo_regiao")
+  metaVotos   Int      @map("meta_votos")
+
+  contaId     String?  @db.Uuid @map("conta_id")
+  conta       Conta?   @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@map("metas_campanha")
+}
+
+model Disparo {
+  id           String            @id @default(uuid()) @db.Uuid
+  titulo       String
+  mensagem     String
+  status       String            // "Pendente", "Enviando", "Concluido", "Erro"
+  listaId      String?           @db.Uuid @map("lista_id")
+  lista        ListaTransmissao? @relation(fields: [listaId], references: [id], onDelete: SetNull)
+  criadoEm     DateTime          @default(now()) @map("criado_em")
+  logs         DisparoLog[]
+
+  contaId      String?           @db.Uuid @map("conta_id")
+  conta        Conta?            @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@map("disparos")
+}
+
+model DisparoLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  disparoId  String   @db.Uuid @map("disparo_id")
+  disparo    Disparo  @relation(fields: [disparoId], references: [id], onDelete: Cascade)
+  eleitorId  String   @db.Uuid @map("eleitor_id")
+  eleitor    Eleitor  @relation(fields: [eleitorId], references: [id], onDelete: Cascade)
+  status     String   // "Enviado", "Erro"
+  erro       String?
+  enviadoEm  DateTime @default(now()) @map("enviado_em")
+
+  @@map("disparo_logs")
+}
+
+model Formulario {
+  id                    String               @id @default(uuid()) @db.Uuid
+  titulo                String
+  descricao             String?
+  liderId               String?              @db.Uuid @map("lider_id")
+  lider                 Eleitor?             @relation("FormularioLider", fields: [liderId], references: [id], onDelete: SetNull)
+
+  exibirDataNascimento  Boolean              @default(true) @map("exibir_data_nascimento")
+  exibirEndereco        Boolean              @default(true) @map("exibir_endereco")
+
+  cidadeId              String?              @db.Uuid @map("cidade_padrao_id")
+  cidade                Cidade?              @relation(fields: [cidadeId], references: [id], onDelete: SetNull)
+  bairroId              String?              @db.Uuid @map("bairro_padrao_id")
+  bairro                Bairro?              @relation(fields: [bairroId], references: [id], onDelete: SetNull)
+
+  criadoEm              DateTime             @default(now()) @map("criado_em")
+  atualizadoEm          DateTime             @updatedAt @map("atualizado_em")
+
+  // Relacionamentos
+  eleitores             Eleitor[]            @relation("FormularioEleitores")
+  etiquetas             FormularioEtiqueta[]
+
+  contaId               String?              @db.Uuid @map("conta_id")
+  conta                 Conta?               @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@map("formularios")
+}
+
+model FormularioEtiqueta {
+  formularioId  String     @map("formulario_id") @db.Uuid
+  etiquetaId    String     @map("etiqueta_id") @db.Uuid
+
+  formulario    Formulario @relation(fields: [formularioId], references: [id], onDelete: Cascade)
+  etiqueta      Etiqueta   @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+
+  @@id([formularioId, etiquetaId])
+  @@map("formulario_etiquetas")
+}
+
+model ListaTransmissao {
+  id           String                     @id @default(uuid()) @db.Uuid
+  nome         String
+  descricao    String?
+  tipo         String                     @default("FILTRO") // "FILTRO" (segmentada) ou "MANUAL" (estática)
+
+  // Filtros aplicados se tipo for "FILTRO"
+  bairroId     String?                    @db.Uuid @map("bairro_id")
+  bairro       Bairro?                    @relation(fields: [bairroId], references: [id], onDelete: SetNull)
+  temperatura  Int?                       // null significa todas as temperaturas, ou número 1 a 5
+
+  // Relacionamentos muitos-para-muitos
+  etiquetas    ListaTransmissaoEtiqueta[] // Tags obrigatórias do filtro
+  eleitores    ListaTransmissaoEleitor[]  // Contatos selecionados manualmente
+
+  disparos     Disparo[]                  // Histórico de disparos associados a esta lista
+
+  criadoEm     DateTime                   @default(now()) @map("criado_em")
+  atualizadoEm DateTime                   @updatedAt @map("atualizado_em")
+
+  contaId      String?                    @db.Uuid @map("conta_id")
+  conta        Conta?                     @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@unique([nome, contaId])
+  @@map("listas_transmissao")
+}
+
+model ListaTransmissaoEtiqueta {
+  listaId    String           @map("lista_id") @db.Uuid
+  etiquetaId String           @map("etiqueta_id") @db.Uuid
+  lista      ListaTransmissao @relation(fields: [listaId], references: [id], onDelete: Cascade)
+  etiqueta   Etiqueta         @relation(fields: [etiquetaId], references: [id], onDelete: Cascade)
+
+  @@id([listaId, etiquetaId])
+  @@map("lista_transmissao_etiquetas")
+}
+
+model CorrespondenciaTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  titulo       String   // "Carta de Aniversário", "Convite Reunião"
+  categoria    String   @default("Geral") // "Aniversário", "Informativo", "Convite", "Geral"
+
+  tipo         String   @default("PDF") // "PDF" ou "WORD"
+
+  // Campos usados quando tipo = "PDF"
+  conteudo     String?  // Corpo da carta com marcadores {nome}, {bairro}, etc. (Pode ser nulo se for Word)
+  cabecalho    String?  // Texto do cabeçalho
+  rodape       String?  // Texto do rodapé
+
+  // Campos usados quando tipo = "WORD"
+  arquivoNome  String?  // Nome original do arquivo Word subido
+  arquivoBase64 String? // Conteúdo do arquivo Word convertido em Base64 longo
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  contaId      String?  @db.Uuid @map("conta_id")
+  conta        Conta?   @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@map("correspondencia_templates")
+}
+
+model ListaTransmissaoEleitor {
+  listaId   String           @map("lista_id") @db.Uuid
+  eleitorId String           @map("eleitor_id") @db.Uuid
+  lista     ListaTransmissao @relation(fields: [listaId], references: [id], onDelete: Cascade)
+  eleitor   Eleitor          @relation(fields: [eleitorId], references: [id], onDelete: Cascade)
+
+  @@id([listaId, eleitorId])
+  @@map("lista_transmissao_eleitores")
+}

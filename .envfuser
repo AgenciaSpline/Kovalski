@@ -1,0 +1,1 @@
+NEXTAUTH_URL=https://kovalski.anok.shop NEXT_PUBLIC_APP_URL=https://kovalski.anok.shop NEXTAUTH_SECRET=uma-chave-muito-segura-e-secreta-para-o-kovalski-crm-2026 -k 3005/tcp

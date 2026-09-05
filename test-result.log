@@ -1,0 +1,19 @@
+=== INTEGRATION TEST: FORM BUILDER ===
+
+1. Creating test form...
+   Form created successfully! ID: 865cc883-a037-4033-aced-3d898e7f634d
+2. Submitting lead registration using the public form...
+   Lead registered successfully! ID: 34ded854-5e5c-4f20-9029-819f49ff2b07
+3. Verifying registered lead details...
+   Lead Name: Eleitor Teste Claude
+   Lead Phone: 11999998888 (clean: 11999998888)
+   Form Linkage: OK
+   Form Title: Formulário de Teste Automatizado
+   Cidade ID: OK
+   Bairro ID: OK
+   Associated Tags: Cadastro Web, Reunião Centro
+   Tags verification: OK
+4. Cleaning up test data...
+   Clean up: OK
+
+ALL TESTS PASSED SUCCESSFULLY!

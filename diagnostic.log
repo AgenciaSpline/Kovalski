@@ -1,0 +1,77 @@
+{
+  "cidades": [
+    {
+      "id": "8e0f2722-c298-4bad-9e25-2e5a3fa5b9bf",
+      "nome": "São Paulo"
+    },
+    {
+      "id": "c9363d69-db5e-48d6-8979-b8e851a6eb2b",
+      "nome": "Eunápolis"
+    }
+  ],
+  "bairros": [
+    {
+      "id": "271deb35-f520-4243-a9e3-d3cd6d1ba319",
+      "nome": "Jardim América"
+    },
+    {
+      "id": "ddf5ca3c-6d2f-430d-9ac2-4ad750622e33",
+      "nome": "Vila Nova"
+    },
+    {
+      "id": "16bf2754-3b37-414c-8621-47044c6ed296",
+      "nome": "Parque das Flores"
+    },
+    {
+      "id": "b801dbfb-c302-470f-8159-6866afc273cd",
+      "nome": "Ipanema"
+    },
+    {
+      "id": "ab98ba40-65dd-477d-a2e7-09684e4ddd2a",
+      "nome": "Santa Rita"
+    },
+    {
+      "id": "52c0946a-0cd3-4f83-896a-becf99c6a04b",
+      "nome": "Centro"
+    }
+  ],
+  "lideres": [],
+  "etiquetas": [
+    {
+      "id": "1970b59e-aeae-43ac-8944-fb9802c309c3",
+      "nome": "Reunião Centro"
+    },
+    {
+      "id": "c0cbf896-9afb-4ab0-a439-7befd7ec7c43",
+      "nome": "Caminhada Zona Sul"
+    },
+    {
+      "id": "3cf3bcc4-4758-43c8-b82a-f93cd789c21d",
+      "nome": "Comício Jd. América"
+    },
+    {
+      "id": "51abfb8c-603b-4fe5-aa6c-aa7540e111d5",
+      "nome": "Líder de Bairro"
+    },
+    {
+      "id": "cf208042-d3c1-4cab-81bc-ff2dccee0507",
+      "nome": "Liderança Esportiva"
+    },
+    {
+      "id": "2e4a2ccc-9404-41c0-8f8b-d136b62e3e41",
+      "nome": "Líder Religioso"
+    },
+    {
+      "id": "e98dfa6b-4952-44fd-a8a2-07609481a65f",
+      "nome": "Apoio Saúde"
+    },
+    {
+      "id": "abb0ebc5-c938-4c5e-91f1-585d67746ca6",
+      "nome": "Apoio Educação"
+    },
+    {
+      "id": "7b7ef74f-17aa-475f-a65d-81ef75e4fda7",
+      "nome": "Foco Segurança"
+    }
+  ]
+}

@@ -1,0 +1,1832 @@
+'use server'
+
+import prisma from './prisma'
+import { revalidatePath } from 'next/cache'
+import fs from 'fs'
+import * as bcrypt from 'bcryptjs'
+
+// ==========================================
+// USUARIOS ACTIONS
+// ==========================================
+
+export async function getUsuarios() {
+  try {
+    const data = await prisma.usuario.findMany({
+      orderBy: { nome: 'asc' },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        role: true,
+        criadoEm: true
+      }
+    })
+    return data
+  } catch (error) {
+    console.error('Erro ao buscar usuários:', error)
+    return []
+  }
+}
+
+export async function createUsuario(data: { nome: string; email: string; senha?: string; role: string }) {
+  try {
+    const existing = await prisma.usuario.findUnique({
+      where: { email: data.email },
+    })
+    if (existing) {
+      return { success: false, error: 'E-mail já cadastrado.' }
+    }
+
+    const hashedPassword = await bcrypt.hash(data.senha || '123456', 10)
+
+    const usuario = await prisma.usuario.create({
+      data: {
+        nome: data.nome,
+        email: data.email,
+        senha: hashedPassword,
+        role: data.role,
+      },
+    })
+    revalidatePath('/')
+    return { success: true, data: { id: usuario.id } }
+  } catch (error) {
+    console.error('Erro ao criar usuário:', error)
+    return { success: false, error: 'Erro ao cadastrar usuário.' }
+  }
+}
+
+export async function updateUsuario(id: string, data: { nome: string; email: string; senha?: string; role: string }) {
+  try {
+    const existing = await prisma.usuario.findFirst({
+      where: { email: data.email, NOT: { id } },
+    })
+    if (existing) {
+      return { success: false, error: 'E-mail já cadastrado por outro usuário.' }
+    }
+
+    const updateData: any = {
+      nome: data.nome,
+      email: data.email,
+      role: data.role,
+    }
+
+    if (data.senha && data.senha.trim().length > 0) {
+      updateData.senha = await bcrypt.hash(data.senha, 10)
+    }
+
+    await prisma.usuario.update({
+      where: { id },
+      data: updateData,
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao atualizar usuário:', error)
+    return { success: false, error: 'Erro ao atualizar usuário.' }
+  }
+}
+
+export async function deleteUsuario(id: string) {
+  try {
+    await prisma.usuario.delete({
+      where: { id },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao excluir usuário:', error)
+    return { success: false, error: 'Erro ao excluir usuário.' }
+  }
+}
+
+// ==========================================
+// ETIQUETAS ACTIONS
+// ==========================================
+
+export async function getEtiquetas() {
+  try {
+    return await prisma.etiqueta.findMany({
+      orderBy: { nome: 'asc' },
+    })
+  } catch (error) {
+    console.error('Erro ao buscar etiquetas:', error)
+    return []
+  }
+}
+
+export async function createEtiqueta(data: {
+  nome: string
+  categoria: string
+  cor: string
+}) {
+  try {
+    const etiqueta = await prisma.etiqueta.create({
+      data: {
+        nome: data.nome,
+        categoria: data.categoria,
+        cor: data.cor,
+      },
+    })
+    revalidatePath('/')
+    return { success: true, data: etiqueta }
+  } catch (error) {
+    console.error('Erro ao criar etiqueta:', error)
+    return { success: false, error: 'Erro ao criar etiqueta' }
+  }
+}
+
+export async function updateEtiqueta(
+  id: string,
+  data: { nome: string; categoria: string; cor: string }
+) {
+  try {
+    const etiqueta = await prisma.etiqueta.update({
+      where: { id },
+      data: {
+        nome: data.nome,
+        categoria: data.categoria,
+        cor: data.cor,
+      },
+    })
+    revalidatePath('/')
+    return { success: true, data: etiqueta }
+  } catch (error) {
+    console.error('Erro ao atualizar etiqueta:', error)
+    return { success: false, error: 'Erro ao atualizar etiqueta' }
+  }
+}
+
+export async function deleteEtiqueta(id: string) {
+  try {
+    await prisma.etiqueta.delete({
+      where: { id },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao excluir etiqueta:', error)
+    return { success: false, error: 'Erro ao excluir etiqueta' }
+  }
+}
+
+// ==========================================
+// CIDADES ACTIONS
+// ==========================================
+
+export async function getCidades() {
+  try {
+    return await prisma.cidade.findMany({
+      orderBy: { nome: 'asc' },
+    })
+  } catch (error) {
+    console.error('Erro ao buscar cidades:', error)
+    return []
+  }
+}
+
+export async function createCidade(data: { nome: string }) {
+  try {
+    const existing = await prisma.cidade.findUnique({
+      where: { nome: data.nome },
+    })
+    if (existing) {
+      return { success: false, error: 'Cidade já cadastrada.' }
+    }
+    const cidade = await prisma.cidade.create({
+      data: { nome: data.nome },
+    })
+    revalidatePath('/')
+    return { success: true, data: cidade }
+  } catch (error) {
+    console.error('Erro ao criar cidade:', error)
+    return { success: false, error: 'Erro ao criar cidade.' }
+  }
+}
+
+export async function updateCidade(id: string, data: { nome: string }) {
+  try {
+    const existing = await prisma.cidade.findFirst({
+      where: {
+        nome: data.nome,
+        NOT: { id },
+      },
+    })
+    if (existing) {
+      return { success: false, error: 'Já existe outra cidade com este nome.' }
+    }
+    const cidade = await prisma.cidade.update({
+      where: { id },
+      data: { nome: data.nome },
+    })
+    revalidatePath('/')
+    return { success: true, data: cidade }
+  } catch (error) {
+    console.error('Erro ao atualizar cidade:', error)
+    return { success: false, error: 'Erro ao atualizar cidade.' }
+  }
+}
+
+export async function deleteCidade(id: string) {
+  try {
+    // Verificar se há eleitores vinculados diretamente à cidade
+    const eleitoresCount = await prisma.eleitor.count({
+      where: { cidadeId: id },
+    })
+    if (eleitoresCount > 0) {
+      return { success: false, error: 'Não é possível excluir a cidade, pois há eleitores vinculados a ela.' }
+    }
+
+    // Verificar se há bairros vinculados à cidade
+    const bairrosCount = await prisma.bairro.count({
+      where: { cidadeId: id },
+    })
+    if (bairrosCount > 0) {
+      return { success: false, error: 'Não é possível excluir a cidade, pois há bairros vinculados a ela.' }
+    }
+
+    await prisma.cidade.delete({
+      where: { id },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao excluir cidade:', error)
+    return { success: false, error: 'Erro ao excluir cidade.' }
+  }
+}
+
+// ==========================================
+// BAIRROS ACTIONS
+// ==========================================
+
+export async function getBairros() {
+  try {
+    return await prisma.bairro.findMany({
+      orderBy: { nome: 'asc' },
+      include: {
+        cidade: true,
+      },
+    })
+  } catch (error) {
+    console.error('Erro ao buscar bairros:', error)
+    return []
+  }
+}
+
+export async function createBairro(data: { nome: string; cidadeId: string }) {
+  try {
+    const existing = await prisma.bairro.findFirst({
+      where: {
+        nome: data.nome,
+        cidadeId: data.cidadeId,
+      },
+    })
+    if (existing) {
+      return { success: false, error: 'Este bairro já está cadastrado nesta cidade.' }
+    }
+    const bairro = await prisma.bairro.create({
+      data: {
+        nome: data.nome,
+        cidadeId: data.cidadeId,
+      },
+    })
+    revalidatePath('/')
+    return { success: true, data: bairro }
+  } catch (error) {
+    console.error('Erro ao criar bairro:', error)
+    return { success: false, error: 'Erro ao criar bairro.' }
+  }
+}
+
+export async function updateBairro(id: string, data: { nome: string; cidadeId: string }) {
+  try {
+    const existing = await prisma.bairro.findFirst({
+      where: {
+        nome: data.nome,
+        cidadeId: data.cidadeId,
+        NOT: { id },
+      },
+    })
+    if (existing) {
+      return { success: false, error: 'Já existe este bairro cadastrado nesta cidade.' }
+    }
+    const bairro = await prisma.bairro.update({
+      where: { id },
+      data: {
+        nome: data.nome,
+        cidadeId: data.cidadeId,
+      },
+    })
+    revalidatePath('/')
+    return { success: true, data: bairro }
+  } catch (error) {
+    console.error('Erro ao atualizar bairro:', error)
+    return { success: false, error: 'Erro ao atualizar bairro.' }
+  }
+}
+
+export async function deleteBairro(id: string) {
+  try {
+    const eleitoresCount = await prisma.eleitor.count({
+      where: { bairroId: id },
+    })
+    if (eleitoresCount > 0) {
+      return { success: false, error: 'Não é possível excluir o bairro, pois há eleitores cadastrados nele.' }
+    }
+
+    await prisma.bairro.delete({
+      where: { id },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao excluir bairro:', error)
+    return { success: false, error: 'Erro ao excluir bairro.' }
+  }
+}
+
+// ==========================================
+// ELEITORES ACTIONS
+// ==========================================
+
+export interface EleitorFilters {
+  search?: string
+  bairro?: string // bairroId
+  temperatura?: number
+}
+
+export async function getEleitores(filters: EleitorFilters = {}) {
+  try {
+    const where: any = {}
+
+    if (filters.search) {
+      where.OR = [
+        { nomeCompleto: { contains: filters.search, mode: 'insensitive' } },
+        { logradouro: { contains: filters.search, mode: 'insensitive' } },
+        { cidade: { nome: { contains: filters.search, mode: 'insensitive' } } },
+        { bairro: { nome: { contains: filters.search, mode: 'insensitive' } } }
+      ]
+    }
+
+    if (filters.bairro && filters.bairro !== 'todos') {
+      where.bairroId = filters.bairro
+    }
+
+    if (filters.temperatura && filters.temperatura !== 0) {
+      where.temperatura = Number(filters.temperatura)
+    }
+
+    const data = await prisma.eleitor.findMany({
+      where,
+      include: {
+        bairro: {
+          include: {
+            cidade: true,
+          },
+        },
+        cidade: true,
+        lider: true,
+        historicos: {
+          orderBy: { criadoEm: 'desc' }
+        },
+        etiquetas: {
+          include: {
+            etiqueta: true,
+          },
+        },
+      },
+      orderBy: { nomeCompleto: 'asc' },
+    })
+
+    // Mapear para facilitar o uso no frontend mantendo compatibilidade
+    return data.map((eleitor) => ({
+      ...eleitor,
+      bairro: eleitor.bairro.nome,
+      cidade: eleitor.cidade.nome,
+      bairroId: eleitor.bairroId,
+      cidadeId: eleitor.cidadeId,
+      liderNome: eleitor.lider?.nomeCompleto || null,
+      etiquetas: eleitor.etiquetas.map((ee) => ee.etiqueta),
+    }))
+  } catch (error) {
+    console.error('Erro ao buscar eleitores:', error)
+    return []
+  }
+}
+
+export async function createEleitor(data: {
+  nomeCompleto: string
+  telefone: string
+  logradouro?: string
+  numero?: string
+  bairroId: string
+  cidadeId: string
+  dataNascimento?: Date
+  temperatura: number
+  etiquetaIds: string[]
+  isLider?: boolean
+  liderId?: string
+}) {
+  try {
+    const cleanPhone = data.telefone.replace(/\D/g, '')
+
+    // Verificar se já existe um eleitor com esse telefone
+    const existing = await prisma.eleitor.findUnique({
+      where: { telefone: cleanPhone },
+    })
+
+    if (existing) {
+      // Upsert: Atualizar os dados do eleitor existente e adicionar as novas tags
+      const updateData: any = {}
+
+      // Atualizar dados básicos caso não existam no registro atual ou sejam novos inputs
+      if (data.nomeCompleto && existing.nomeCompleto !== data.nomeCompleto) updateData.nomeCompleto = data.nomeCompleto
+      if (data.logradouro && !existing.logradouro) updateData.logradouro = data.logradouro
+      if (data.numero && !existing.numero) updateData.numero = data.numero
+      if (data.bairroId && existing.bairroId !== data.bairroId) updateData.bairroId = data.bairroId
+      if (data.cidadeId && existing.cidadeId !== data.cidadeId) updateData.cidadeId = data.cidadeId
+      if (data.dataNascimento && !existing.dataNascimento) updateData.dataNascimento = data.dataNascimento
+      if (data.temperatura && existing.temperatura !== data.temperatura) updateData.temperatura = data.temperatura
+      if (data.isLider !== undefined && existing.isLider !== data.isLider) updateData.isLider = data.isLider
+      if (data.liderId && !existing.liderId) updateData.liderId = data.liderId
+
+      const eleitorAtualizado = await prisma.eleitor.update({
+        where: { id: existing.id },
+        data: {
+          ...updateData,
+          etiquetas: {
+            // Ignorará erros de constraint por duplicidade nas etiquetas (se aplicável ao DB, mas garantimos verificando depois ou upsert)
+            // Para etiquetas, precisamos conectar ou criar a relação sem duplicar
+            connectOrCreate: data.etiquetaIds.map(id => ({
+              where: {
+                eleitorId_etiquetaId: { eleitorId: existing.id, etiquetaId: id }
+              },
+              create: {
+                etiquetaId: id
+              }
+            }))
+          },
+          historicos: {
+            create: {
+              tipo: 'ATUALIZACAO',
+              descricao: `Cadastro unificado manualmente pelo painel.`
+            }
+          }
+        },
+      })
+      revalidatePath('/')
+      return { success: true, data: eleitorAtualizado }
+    }
+
+    const eleitor = await prisma.eleitor.create({
+      data: {
+        nomeCompleto: data.nomeCompleto,
+        telefone: cleanPhone,
+        logradouro: data.logradouro,
+        numero: data.numero,
+        bairroId: data.bairroId,
+        cidadeId: data.cidadeId,
+        dataNascimento: data.dataNascimento,
+        temperatura: data.temperatura,
+        isLider: data.isLider ?? false,
+        liderId: data.liderId || null,
+        etiquetas: {
+          create: data.etiquetaIds.map((id) => ({
+            etiquetaId: id,
+          })),
+        },
+        historicos: {
+          create: {
+            tipo: 'CRIACAO',
+            descricao: `Cadastrado manualmente pelo painel.`
+          }
+        }
+      },
+    })
+
+    revalidatePath('/')
+    return { success: true, data: eleitor }
+  } catch (error) {
+    console.error('Erro ao criar eleitor:', error)
+    return { success: false, error: 'Erro interno ao cadastrar eleitor.' }
+  }
+}
+
+export async function updateEleitor(
+  id: string,
+  data: {
+    nomeCompleto: string
+    telefone: string
+    logradouro?: string
+    numero?: string
+    bairroId: string
+    cidadeId: string
+    dataNascimento?: Date
+    temperatura: number
+    etiquetaIds: string[]
+    isLider?: boolean
+    liderId?: string
+  }
+) {
+  try {
+    const cleanPhone = data.telefone.replace(/\D/g, '')
+
+    // Verificar duplicidade de telefone (se mudou)
+    const existing = await prisma.eleitor.findFirst({
+      where: {
+        telefone: cleanPhone,
+        NOT: { id },
+      },
+    })
+    if (existing) {
+      return { success: false, error: 'Telefone já em uso por outro eleitor.' }
+    }
+
+    // Atualizar dados cadastrais
+    await prisma.eleitor.update({
+      where: { id },
+      data: {
+        nomeCompleto: data.nomeCompleto,
+        telefone: cleanPhone,
+        logradouro: data.logradouro,
+        numero: data.numero,
+        bairroId: data.bairroId,
+        cidadeId: data.cidadeId,
+        dataNascimento: data.dataNascimento,
+        temperatura: data.temperatura,
+        isLider: data.isLider ?? false,
+        liderId: data.liderId || null,
+        historicos: {
+          create: {
+            tipo: 'ATUALIZACAO',
+            descricao: `Dados atualizados manualmente pelo painel.`
+          }
+        }
+      },
+    })
+
+    // Atualizar etiquetas N:N (Excluir antigas e inserir novas)
+    await prisma.eleitorEtiqueta.deleteMany({
+      where: { eleitorId: id },
+    })
+
+    if (data.etiquetaIds.length > 0) {
+      await prisma.eleitorEtiqueta.createMany({
+        data: data.etiquetaIds.map((etiquetaId) => ({
+          eleitorId: id,
+          etiquetaId,
+        })),
+      })
+    }
+
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao atualizar eleitor:', error)
+    return { success: false, error: 'Erro interno ao atualizar eleitor.' }
+  }
+}
+
+export async function deleteEleitor(id: string) {
+  try {
+    await prisma.eleitor.delete({
+      where: { id },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao excluir eleitor:', error)
+    return { success: false, error: 'Erro interno ao excluir eleitor.' }
+  }
+}
+
+// ==========================================
+// DASHBOARD ACTIONS
+// ==========================================
+
+export async function getDashboardStats(bairroFilter?: string) {
+  try {
+    const where: any = {}
+    if (bairroFilter && bairroFilter !== 'todos') {
+      where.bairroId = bairroFilter
+    }
+
+    // 1. Total de Eleitores (com filtro geográfico opcional)
+    const totalEleitores = await prisma.eleitor.count({ where })
+
+    // 2. Metas de Campanha
+    const meta = await prisma.metaCampanha.findFirst()
+    const metaVotos = meta ? meta.metaVotos : 0
+    const cargoRegiao = meta ? meta.cargoRegiao : 'Não configurado'
+
+    // 3. Contagem por nível de temperatura
+    const contagemTemperatura = await prisma.eleitor.groupBy({
+      by: ['temperatura'],
+      where,
+      _count: {
+        id: true,
+      },
+    })
+
+    // Mapear contagens para um array de 1 a 5 ordenado
+    const contagemMap: { [key: number]: number } = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    }
+
+    contagemTemperatura.forEach((group) => {
+      contagemMap[group.temperatura] = group._count.id
+    })
+
+    // Pesos da fórmula de Projeção de Votos:
+    // Temp 1 (Frio) -> Peso 0.0
+    // Temp 2 (Morno) -> Peso 0.25
+    // Temp 3 (Inclinado) -> Peso 0.50
+    // Temp 4 (Quente) -> Peso 0.80
+    // Temp 5 (Multiplicador) -> Peso 1.00
+    const pesos: { [key: number]: number } = {
+      1: 0.0,
+      2: 0.25,
+      3: 0.5,
+      4: 0.8,
+      5: 1.0,
+    }
+
+    let votosPossiveis = 0
+    Object.keys(contagemMap).forEach((tempStr) => {
+      const temp = Number(tempStr)
+      const qtd = contagemMap[temp]
+      const peso = pesos[temp]
+      votosPossiveis += qtd * peso
+    })
+
+    // Formatar para exibição no gráfico
+    const funilTemperatura = [
+      { nome: '1 - Frio (0%)', quantidade: contagemMap[1], cor: '#ef4444' },
+      { nome: '2 - Morno (25%)', quantidade: contagemMap[2], cor: '#f97316' },
+      { nome: '3 - Inclinado (50%)', quantidade: contagemMap[3], cor: '#eab308' },
+      { nome: '4 - Quente (80%)', quantidade: contagemMap[4], cor: '#3b82f6' },
+      { nome: '5 - Líder (100%)', quantidade: contagemMap[5], cor: '#10b981' },
+    ]
+
+    // Estatísticas por Bairro (panorama geral, sempre global)
+    const eleitoresPorBairro = await prisma.eleitor.groupBy({
+      by: ['bairroId'],
+      _count: {
+        id: true,
+      },
+    })
+
+    // Obter nomes dos bairros em cache de memória para o mapeamento
+    const allBairros = await prisma.bairro.findMany()
+    const bairroMap = new Map(allBairros.map((b) => [b.id, b.nome]))
+
+    const dadosBairros = eleitoresPorBairro
+      .map((eb) => ({
+        bairro: bairroMap.get(eb.bairroId) || 'Desconhecido',
+        quantidade: eb._count.id,
+      }))
+      .sort((a, b) => a.bairro.localeCompare(b.bairro))
+
+    return {
+      success: true,
+      data: {
+        totalEleitores,
+        metaVotos,
+        cargoRegiao,
+        votosPossiveis: Math.round(votosPossiveis * 10) / 10, // arredondar para 1 casa decimal
+        funilTemperatura,
+        dadosBairros,
+      },
+    }
+  } catch (error) {
+    console.error('Erro ao carregar estatísticas do dashboard:', error)
+    return {
+      success: false,
+      error: 'Erro interno ao carregar estatísticas.',
+      data: {
+        totalEleitores: 0,
+        metaVotos: 0,
+        cargoRegiao: 'Erro de conexão',
+        votosPossiveis: 0,
+        funilTemperatura: [],
+        dadosBairros: [],
+      },
+    }
+  }
+}
+
+export async function saveMetaCampanha(cargoRegiao: string, metaVotos: number) {
+  try {
+    const meta = await prisma.metaCampanha.findFirst()
+
+    if (meta) {
+      await prisma.metaCampanha.update({
+        where: { id: meta.id },
+        data: { cargoRegiao, metaVotos },
+      })
+    } else {
+      await prisma.metaCampanha.create({
+        data: { cargoRegiao, metaVotos },
+      })
+    }
+
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao salvar meta de campanha:', error)
+    return { success: false, error: 'Erro ao salvar meta de campanha.' }
+  }
+}
+
+// ==========================================
+// LIDERANÇAS E MALA DIRETA ACTIONS
+// ==========================================
+
+export async function getLideres() {
+  try {
+    const data = await prisma.eleitor.findMany({
+      where: { isLider: true },
+      orderBy: { nomeCompleto: 'asc' },
+    })
+    return data.map((eleitor) => ({
+      id: eleitor.id,
+      nomeCompleto: eleitor.nomeCompleto,
+      telefone: eleitor.telefone,
+    }))
+  } catch (error) {
+    console.error('Erro ao buscar líderes:', error)
+    return []
+  }
+}
+
+export async function getDisparos() {
+  try {
+    const disparos = await prisma.disparo.findMany({
+      orderBy: { criadoEm: 'desc' },
+      include: {
+        logs: true,
+        lista: {
+          select: {
+            nome: true
+          }
+        }
+      }
+    })
+
+    return disparos.map(d => {
+      const total = d.logs.length
+      const sucesso = d.logs.filter(l => l.status === 'Enviado').length
+      const erro = d.logs.filter(l => l.status === 'Erro').length
+      return {
+        id: d.id,
+        titulo: d.titulo,
+        mensagem: d.mensagem,
+        status: d.status,
+        criadoEm: d.criadoEm,
+        listaNome: d.lista?.nome || 'Mala Direta Direta',
+        listaId: d.listaId,
+        total,
+        sucesso,
+        erro
+      }
+    })
+  } catch (error) {
+    console.error('Erro ao buscar disparos:', error)
+    return []
+  }
+}
+
+export async function createEleitorPublic(data: {
+  nomeCompleto: string
+  telefone: string
+  logradouro?: string
+  numero?: string
+  bairroId: string
+  cidadeId: string
+  dataNascimento?: Date
+  liderId?: string
+}) {
+  try {
+    const cleanPhone = data.telefone.replace(/\D/g, '')
+
+    // Criar/Buscar etiqueta padrão "Cadastro Web"
+    let webTag = await prisma.etiqueta.findFirst({
+      where: { nome: 'Cadastro Web' }
+    })
+    if (!webTag) {
+      webTag = await prisma.etiqueta.create({
+        data: {
+          nome: 'Cadastro Web',
+          categoria: 'Origem',
+          cor: '#f97316'
+        }
+      })
+    }
+
+    // Verificar se já existe um eleitor com esse telefone
+    const existing = await prisma.eleitor.findUnique({
+      where: { telefone: cleanPhone },
+    })
+
+    if (existing) {
+      // Upsert: Atualiza os dados se novos
+      const updateData: any = {}
+      if (data.nomeCompleto && existing.nomeCompleto !== data.nomeCompleto) updateData.nomeCompleto = data.nomeCompleto
+      if (data.logradouro && !existing.logradouro) updateData.logradouro = data.logradouro
+      if (data.numero && !existing.numero) updateData.numero = data.numero
+      if (data.bairroId && existing.bairroId !== data.bairroId) updateData.bairroId = data.bairroId
+      if (data.cidadeId && existing.cidadeId !== data.cidadeId) updateData.cidadeId = data.cidadeId
+      if (data.dataNascimento && !existing.dataNascimento) updateData.dataNascimento = data.dataNascimento
+      if (data.liderId && !existing.liderId) updateData.liderId = data.liderId
+
+      const eleitorAtualizado = await prisma.eleitor.update({
+        where: { id: existing.id },
+        data: {
+          ...updateData,
+          etiquetas: {
+            connectOrCreate: [{
+              where: {
+                eleitorId_etiquetaId: { eleitorId: existing.id, etiquetaId: webTag.id }
+              },
+              create: {
+                etiquetaId: webTag.id
+              }
+            }]
+          },
+          historicos: {
+            create: {
+              tipo: 'ATUALIZACAO',
+              descricao: `Cadastro unificado via Cadastro Público (Web).`
+            }
+          }
+        }
+      })
+      revalidatePath('/')
+      return { success: true, data: eleitorAtualizado }
+    }
+
+    const eleitor = await prisma.eleitor.create({
+      data: {
+        nomeCompleto: data.nomeCompleto,
+        telefone: cleanPhone,
+        logradouro: data.logradouro,
+        numero: data.numero,
+        bairroId: data.bairroId,
+        cidadeId: data.cidadeId,
+        dataNascimento: data.dataNascimento,
+        temperatura: 1, // Default cold
+        isLider: false,
+        liderId: data.liderId || null,
+        etiquetas: {
+          create: [{ etiquetaId: webTag.id }]
+        },
+        historicos: {
+          create: {
+            tipo: 'CRIACAO',
+            descricao: `Cadastrado via Cadastro Público (Web).`
+          }
+        }
+      },
+    })
+
+    revalidatePath('/')
+    return { success: true, data: eleitor }
+  } catch (error) {
+    console.error('Erro ao fazer cadastro público:', error)
+    return { success: false, error: 'Erro interno ao realizar cadastro.' }
+  }
+}
+
+export async function enviarMalaDireta(data: {
+  eleitorIds: string[]
+  mensagemTemplate: string
+  listaId?: string
+}) {
+  const wahaUrl = process.env.WAHA_URL
+  const wahaApiKey = process.env.WAHA_API_KEY
+
+  if (!wahaUrl || !wahaApiKey) {
+    return { success: false, error: 'Serviço de WhatsApp não configurado no servidor (WAHA_URL / WAHA_API_KEY ausentes).' }
+  }
+
+  try {
+    const disparo = await prisma.disparo.create({
+      data: {
+        titulo: `Disparo em massa - ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`,
+        mensagem: data.mensagemTemplate,
+        status: 'Enviando',
+        listaId: data.listaId || null
+      }
+    })
+
+    const eleitores = await prisma.eleitor.findMany({
+      where: { id: { in: data.eleitorIds } }
+    })
+
+    for (const eleitor of eleitores) {
+      let statusLog = 'Enviado'
+      let erroLog: string | null = null
+
+      try {
+        const formatPhone = eleitor.telefone.replace(/\D/g, '')
+
+        let phoneWithDdi = formatPhone
+        if (formatPhone.length === 11 || formatPhone.length === 10) {
+          phoneWithDdi = `55${formatPhone}`
+        }
+
+        const chatId = `${phoneWithDdi}@c.us`
+        const text = data.mensagemTemplate.replace(/{nome}/g, eleitor.nomeCompleto)
+
+        const response = await fetch(`${wahaUrl}/api/sendText`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': wahaApiKey
+          },
+          body: JSON.stringify({
+            chatId,
+            text,
+          })
+        })
+
+        if (!response.ok) {
+          throw new Error(`WAHA HTTP ${response.status} - ${await response.text()}`)
+        }
+      } catch (err: any) {
+        statusLog = 'Erro'
+        erroLog = err.message || 'Erro desconhecido'
+      }
+
+      await prisma.disparoLog.create({
+        data: {
+          disparoId: disparo.id,
+          eleitorId: eleitor.id,
+          status: statusLog,
+          erro: erroLog
+        }
+      })
+    }
+
+    await prisma.disparo.update({
+      where: { id: disparo.id },
+      data: { status: 'Concluido' }
+    })
+
+    revalidatePath('/')
+    return { success: true, disparoId: disparo.id }
+  } catch (error) {
+    console.error('Erro Mala Direta:', error)
+    return { success: false, error: 'Falha crítica ao executar Mala Direta.' }
+  }
+}
+
+// ==========================================
+// FORMULARIOS ACTIONS
+// ==========================================
+
+export async function getFormularios() {
+  try {
+    const formularios = await prisma.formulario.findMany({
+      include: {
+        cidade: true,
+        bairro: true,
+        lider: true,
+        etiquetas: {
+          include: {
+            etiqueta: true,
+          },
+        },
+        _count: {
+          select: {
+            eleitores: true,
+          },
+        },
+      },
+      orderBy: { criadoEm: 'desc' },
+    })
+
+    return formularios.map((f) => ({
+      id: f.id,
+      titulo: f.titulo,
+      descricao: f.descricao,
+      cidadeId: f.cidadeId,
+      bairroId: f.bairroId,
+      liderId: f.liderId,
+      cidade: f.cidade,
+      bairro: f.bairro,
+      lider: f.lider,
+      etiquetas: f.etiquetas.map((fe) => fe.etiqueta),
+      leadsCount: f._count.eleitores,
+      criadoEm: f.criadoEm,
+    }))
+  } catch (error) {
+    console.error('Erro ao buscar formulários:', error)
+    return []
+  }
+}
+
+export async function getFormulario(id: string) {
+  try {
+    const f = await prisma.formulario.findUnique({
+      where: { id },
+      include: {
+        cidade: true,
+        bairro: true,
+        lider: true,
+        etiquetas: {
+          include: {
+            etiqueta: true,
+          },
+        },
+      },
+    })
+    if (!f) return null
+
+    return {
+      id: f.id,
+      titulo: f.titulo,
+      descricao: f.descricao,
+      cidadeId: f.cidadeId,
+      bairroId: f.bairroId,
+      liderId: f.liderId,
+      cidade: f.cidade,
+      bairro: f.bairro,
+      lider: f.lider,
+      etiquetas: f.etiquetas.map((fe) => fe.etiqueta),
+      criadoEm: f.criadoEm,
+    }
+  } catch (error) {
+    console.error('Erro ao obter formulário:', error)
+    return null
+  }
+}
+
+export async function createFormulario(data: {
+  titulo: string
+  descricao?: string
+  cidadeId?: string
+  bairroId?: string
+  liderId?: string
+  exibirDataNascimento: boolean
+  exibirEndereco: boolean
+  etiquetaIds?: string[]
+}) {
+  try {
+    if (!data.titulo.trim()) {
+      return { success: false, error: 'O título do formulário é obrigatório.' }
+    }
+
+    const formulario = await prisma.formulario.create({
+      data: {
+        titulo: data.titulo,
+        descricao: data.descricao || null,
+        cidadeId: data.cidadeId || null,
+        bairroId: data.bairroId || null,
+        liderId: data.liderId || null,
+        exibirDataNascimento: data.exibirDataNascimento,
+        exibirEndereco: data.exibirEndereco,
+        etiquetas: {
+          create: data.etiquetaIds?.map((id) => ({
+            etiquetaId: id,
+          })) || [],
+        },
+      },
+    })
+
+    revalidatePath('/')
+    return { success: true, data: formulario }
+  } catch (error) {
+    console.error('Erro ao criar formulário:', error)
+    return { success: false, error: 'Erro ao criar formulário.' }
+  }
+}
+
+export async function deleteFormulario(id: string) {
+  try {
+    await prisma.formulario.delete({
+      where: { id },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao excluir formulário:', error)
+    return { success: false, error: 'Erro ao excluir formulário.' }
+  }
+}
+
+export async function updateFormulario(
+  id: string,
+  data: {
+    titulo: string
+    descricao?: string
+    cidadeId?: string
+    bairroId?: string
+    liderId?: string
+    exibirDataNascimento: boolean
+    exibirEndereco: boolean
+    etiquetaIds?: string[]
+  }
+) {
+  try {
+    if (!data.titulo.trim()) {
+      return { success: false, error: 'O título do formulário é obrigatório.' }
+    }
+
+    await prisma.formulario.update({
+      where: { id },
+      data: {
+        titulo: data.titulo,
+        descricao: data.descricao || null,
+        cidadeId: data.cidadeId || null,
+        bairroId: data.bairroId || null,
+        liderId: data.liderId || null,
+        exibirDataNascimento: data.exibirDataNascimento,
+        exibirEndereco: data.exibirEndereco,
+      },
+    })
+
+    // Atualizar relação N:N de etiquetas
+    await prisma.formularioEtiqueta.deleteMany({
+      where: { formularioId: id },
+    })
+
+    if (data.etiquetaIds && data.etiquetaIds.length > 0) {
+      await prisma.formularioEtiqueta.createMany({
+        data: data.etiquetaIds.map((etiquetaId) => ({
+          formularioId: id,
+          etiquetaId,
+        })),
+      })
+    }
+
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao atualizar formulário:', error)
+    return { success: false, error: 'Erro ao atualizar formulário.' }
+  }
+}
+
+export async function createEleitorPublicComForm(
+  formId: string,
+  data: {
+    nomeCompleto: string
+    telefone: string
+    logradouro?: string
+    numero?: string
+    cidadeId?: string
+    bairroId?: string
+    dataNascimento?: Date
+    liderId?: string
+  }
+) {
+  try {
+    // 1. Buscar formulário
+    const form = await prisma.formulario.findUnique({
+      where: { id: formId },
+      include: {
+        etiquetas: true,
+      },
+    })
+
+    if (!form) {
+      return { success: false, error: 'Formulário não encontrado ou inativo.' }
+    }
+
+    // 2. Limpar número de telefone
+    const cleanPhone = data.telefone.replace(/\D/g, '')
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      return { success: false, error: 'Número de telefone/WhatsApp inválido. Deve conter DDD.' }
+    }
+
+    // 3. Resolver presets/dados finais
+    const finalCidadeId = form.cidadeId || data.cidadeId
+    const finalBairroId = form.bairroId || data.bairroId
+    const finalLiderId = form.liderId || data.liderId || null
+
+    if (!finalCidadeId) {
+      return { success: false, error: 'A cidade é obrigatória.' }
+    }
+    if (!finalBairroId) {
+      return { success: false, error: 'O bairro é obrigatório.' }
+    }
+
+    // 4. Garantir etiqueta de origem "Cadastro Web"
+    let webTag = await prisma.etiqueta.findFirst({
+      where: { nome: 'Cadastro Web' },
+    })
+    if (!webTag) {
+      webTag = await prisma.etiqueta.create({
+        data: {
+          nome: 'Cadastro Web',
+          categoria: 'Origem',
+          cor: '#f97316',
+        },
+      })
+    }
+
+    const formTags = form.etiquetas.map((fe) => fe.etiquetaId)
+    const uniqueTagIds = Array.from(new Set([webTag.id, ...formTags]))
+
+    // 5. Verificar duplicidade de telefone
+    const existing = await prisma.eleitor.findUnique({
+      where: { telefone: cleanPhone },
+    })
+
+    if (existing) {
+      // Upsert: Atualizar os dados do eleitor existente
+      const updateData: any = {}
+      if (data.nomeCompleto && existing.nomeCompleto !== data.nomeCompleto) updateData.nomeCompleto = data.nomeCompleto
+      if (data.logradouro && !existing.logradouro) updateData.logradouro = data.logradouro
+      if (data.numero && !existing.numero) updateData.numero = data.numero
+      if (finalBairroId && existing.bairroId !== finalBairroId) updateData.bairroId = finalBairroId
+      if (finalCidadeId && existing.cidadeId !== finalCidadeId) updateData.cidadeId = finalCidadeId
+      if (data.dataNascimento && !existing.dataNascimento) updateData.dataNascimento = data.dataNascimento
+      if (finalLiderId && !existing.liderId) updateData.liderId = finalLiderId
+
+      const eleitorAtualizado = await prisma.eleitor.update({
+        where: { id: existing.id },
+        data: {
+          ...updateData,
+          etiquetas: {
+            connectOrCreate: uniqueTagIds.map(id => ({
+              where: {
+                eleitorId_etiquetaId: { eleitorId: existing.id, etiquetaId: id }
+              },
+              create: {
+                etiquetaId: id
+              }
+            }))
+          },
+          historicos: {
+            create: {
+              tipo: 'ATUALIZACAO',
+              descricao: `Atualizado pelo formulário: ${form.titulo}.`
+            }
+          }
+        },
+      })
+      revalidatePath('/')
+      return { success: true, data: eleitorAtualizado }
+    }
+
+    // 6. Cadastrar o eleitor (caso não exista)
+    const eleitor = await prisma.eleitor.create({
+      data: {
+        nomeCompleto: data.nomeCompleto,
+        telefone: cleanPhone,
+        logradouro: data.logradouro || null,
+        numero: data.numero || null,
+        cidadeId: finalCidadeId,
+        bairroId: finalBairroId,
+        dataNascimento: data.dataNascimento || null,
+        temperatura: 1, // Frio por padrão ao se cadastrar publicamente
+        isLider: false,
+        liderId: finalLiderId,
+        formularioId: formId,
+        etiquetas: {
+          create: uniqueTagIds.map((id) => ({
+            etiquetaId: id,
+          })),
+        },
+        historicos: {
+          create: {
+            tipo: 'CRIACAO',
+            descricao: `Cadastrado pelo formulário: ${form.titulo}.`
+          }
+        }
+      },
+    })
+
+    revalidatePath('/')
+    return { success: true, data: eleitor }
+  } catch (error) {
+    console.error('Erro ao salvar cadastro público por formulário:', error)
+    return { success: false, error: 'Erro interno ao realizar cadastro.' }
+  }
+}
+
+// ==========================================
+// LISTAS DE TRANSMISSÃO ACTIONS
+// ==========================================
+
+export async function getListasTransmissao() {
+  try {
+    const listas = await prisma.listaTransmissao.findMany({
+      orderBy: { criadoEm: 'desc' },
+      include: {
+        bairro: true,
+        etiquetas: {
+          include: {
+            etiqueta: true,
+          },
+        },
+        eleitores: {
+          include: {
+            eleitor: true,
+          },
+        },
+      },
+    })
+
+    const listasComContador = await Promise.all(
+      listas.map(async (lista) => {
+        let count = 0
+        let resolvedIds: string[] = []
+
+        if (lista.tipo === 'FILTRO') {
+          const whereClause: any = {}
+          if (lista.bairroId) {
+            whereClause.bairroId = lista.bairroId
+          }
+          if (lista.temperatura !== null && lista.temperatura !== undefined) {
+            whereClause.temperatura = lista.temperatura
+          }
+          if (lista.etiquetas.length > 0) {
+            const tagIds = lista.etiquetas.map((e) => e.etiquetaId)
+            whereClause.etiquetas = {
+              some: {
+                etiquetaId: { in: tagIds },
+              },
+            }
+          }
+
+          let eleitores = await prisma.eleitor.findMany({
+            where: whereClause,
+            include: {
+              etiquetas: true,
+            },
+          })
+
+          // Filtro AND de tags (se o contato possuir TODAS as tags selecionadas)
+          if (lista.etiquetas.length > 0) {
+            const tagIds = lista.etiquetas.map((e) => e.etiquetaId)
+            eleitores = eleitores.filter((el) =>
+              tagIds.every((tagId) => el.etiquetas.some((e) => e.etiquetaId === tagId))
+            )
+          }
+
+          count = eleitores.length
+          resolvedIds = eleitores.map((el) => el.id)
+        } else {
+          count = lista.eleitores.length
+          resolvedIds = lista.eleitores.map((e) => e.eleitorId)
+        }
+
+        return {
+          id: lista.id,
+          nome: lista.nome,
+          descricao: lista.descricao,
+          tipo: lista.tipo,
+          bairroId: lista.bairroId,
+          bairroNome: lista.bairro?.nome || null,
+          temperatura: lista.temperatura,
+          etiquetas: lista.etiquetas.map((e) => e.etiqueta),
+          eleitoresIds: resolvedIds,
+          eleitoresCount: count,
+          criadoEm: lista.criadoEm,
+        }
+      })
+    )
+
+    return listasComContador
+  } catch (error) {
+    console.error('Erro ao buscar listas de transmissão:', error)
+    return []
+  }
+}
+
+export async function createListaTransmissao(data: {
+  nome: string
+  descricao?: string
+  tipo: string // "FILTRO" | "MANUAL"
+  bairroId?: string | null
+  temperatura?: number | null
+  etiquetaIds?: string[]
+  eleitorIds?: string[]
+}) {
+  try {
+    const list = await prisma.listaTransmissao.create({
+      data: {
+        nome: data.nome,
+        descricao: data.descricao || null,
+        tipo: data.tipo,
+        bairroId: data.bairroId || null,
+        temperatura: data.temperatura !== undefined ? data.temperatura : null,
+      },
+    })
+
+    if (data.tipo === 'FILTRO' && data.etiquetaIds && data.etiquetaIds.length > 0) {
+      await prisma.listaTransmissaoEtiqueta.createMany({
+        data: data.etiquetaIds.map((etiquetaId) => ({
+          listaId: list.id,
+          etiquetaId,
+        })),
+      })
+    } else if (data.tipo === 'MANUAL' && data.eleitorIds && data.eleitorIds.length > 0) {
+      await prisma.listaTransmissaoEleitor.createMany({
+        data: data.eleitorIds.map((eleitorId) => ({
+          listaId: list.id,
+          eleitorId,
+        })),
+      })
+    }
+
+    revalidatePath('/')
+    return { success: true, id: list.id }
+  } catch (error: any) {
+    console.error('Erro ao criar lista de transmissão:', error)
+    try {
+      fs.writeFileSync('/root/projeto/crm-eleitoral/error.log', JSON.stringify({
+        message: error.message,
+        stack: error.stack,
+        errorObj: error
+      }, null, 2))
+    } catch (fsErr) {
+      console.error('Erro ao salvar error.log:', fsErr)
+    }
+    return { success: false, error: `Erro ao salvar a lista de transmissão: ${error.message || error}` }
+  }
+}
+
+export async function deleteListaTransmissao(id: string) {
+  try {
+    await prisma.listaTransmissao.delete({
+      where: { id },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao excluir lista de transmissão:', error)
+    return { success: false, error: 'Erro ao excluir a lista de transmissão.' }
+  }
+}
+
+export async function updateListaTransmissao(
+  id: string,
+  data: {
+    nome: string
+    descricao?: string
+    tipo: string // "FILTRO" | "MANUAL"
+    bairroId?: string | null
+    temperatura?: number | null
+    etiquetaIds?: string[]
+    eleitorIds?: string[]
+  }
+) {
+  try {
+    // Verificar duplicidade de nome em outras listas
+    const existing = await prisma.listaTransmissao.findFirst({
+      where: {
+        nome: data.nome,
+        NOT: { id },
+      },
+    })
+    if (existing) {
+      return { success: false, error: 'Já existe outra lista de transmissão com este nome.' }
+    }
+
+    await prisma.listaTransmissao.update({
+      where: { id },
+      data: {
+        nome: data.nome,
+        descricao: data.descricao || null,
+        tipo: data.tipo,
+        bairroId: data.bairroId || null,
+        temperatura: data.temperatura !== undefined ? data.temperatura : null,
+      },
+    })
+
+    // Limpar relações antigas
+    await prisma.listaTransmissaoEtiqueta.deleteMany({
+      where: { listaId: id },
+    })
+    await prisma.listaTransmissaoEleitor.deleteMany({
+      where: { listaId: id },
+    })
+
+    if (data.tipo === 'FILTRO' && data.etiquetaIds && data.etiquetaIds.length > 0) {
+      await prisma.listaTransmissaoEtiqueta.createMany({
+        data: data.etiquetaIds.map((etiquetaId) => ({
+          listaId: id,
+          etiquetaId,
+        })),
+      })
+    } else if (data.tipo === 'MANUAL' && data.eleitorIds && data.eleitorIds.length > 0) {
+      await prisma.listaTransmissaoEleitor.createMany({
+        data: data.eleitorIds.map((eleitorId) => ({
+          listaId: id,
+          eleitorId,
+        })),
+      })
+    }
+
+    revalidatePath('/')
+    return { success: true }
+  } catch (error: any) {
+    console.error('Erro ao atualizar lista de transmissão:', error)
+    return { success: false, error: `Erro ao atualizar a lista de transmissão: ${error.message || error}` }
+  }
+}
+
+export async function importEleitores(rows: {
+  nome: string
+  telefone: string
+  logradouro?: string | null
+  numero?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  dataNascimento?: string | null
+  temperatura?: number | null
+  isLider?: boolean
+  etiquetas?: string[]
+}[]) {
+  try {
+    let criados = 0
+    let atualizados = 0
+
+    // Buscar todas as cidades, bairros e etiquetas existentes para reduzir consultas no banco
+    const existingCidades = await prisma.cidade.findMany()
+    const existingBairros = await prisma.bairro.findMany()
+    const existingEtiquetas = await prisma.etiqueta.findMany()
+
+    // Mapas em memória para correspondência rápida por nome normalizado (lowercase e trim)
+    const cidadeMap = new Map(existingCidades.map(c => [c.nome.toLowerCase().trim(), c.id]))
+    const bairroMap = new Map(existingBairros.map(b => [`${b.nome.toLowerCase().trim()}_${b.cidadeId}`, b.id]))
+    const etiquetaMap = new Map(existingEtiquetas.map(e => [e.nome.toLowerCase().trim(), e.id]))
+
+    // Obter ou criar uma cidade padrão para fallback (ex: a primeira encontrada, ou "São Paulo")
+    let defaultCidadeId = existingCidades[0]?.id
+    if (!defaultCidadeId) {
+      const defaultCidade = await prisma.cidade.create({
+        data: { nome: 'São Paulo' }
+      })
+      defaultCidadeId = defaultCidade.id
+      cidadeMap.set('são paulo', defaultCidade.id)
+    }
+
+    // Processar cada linha de eleitor
+    for (const row of rows) {
+      const cleanPhone = row.telefone.replace(/\D/g, '')
+      if (!cleanPhone || !row.nome) continue
+
+      // 1. Resolver Cidade ID
+      let rowCidadeId = defaultCidadeId
+      if (row.cidade) {
+        const key = row.cidade.toLowerCase().trim()
+        if (cidadeMap.has(key)) {
+          rowCidadeId = cidadeMap.get(key)!
+        } else {
+          // Criar nova cidade
+          const newCity = await prisma.cidade.create({
+            data: { nome: row.cidade }
+          })
+          rowCidadeId = newCity.id
+          cidadeMap.set(key, newCity.id)
+        }
+      }
+
+      // 2. Resolver Bairro ID
+      let rowBairroId: string
+      let bairroName = row.bairro?.trim() || 'Centro'
+      const bairroKey = `${bairroName.toLowerCase()}_${rowCidadeId}`
+      if (bairroMap.has(bairroKey)) {
+        rowBairroId = bairroMap.get(bairroKey)!
+      } else {
+        // Criar novo bairro
+        const newBairro = await prisma.bairro.create({
+          data: {
+            nome: bairroName,
+            cidadeId: rowCidadeId
+          }
+        })
+        rowBairroId = newBairro.id
+        bairroMap.set(bairroKey, newBairro.id)
+      }
+
+      // 3. Resolver Data de Nascimento
+      let parsedDate: Date | null = null
+      if (row.dataNascimento) {
+        // Tentar parsing do formato brasileiro DD/MM/AAAA ou DD-MM-AAAA
+        const cleanDateStr = row.dataNascimento.replace(/-/g, '/')
+        const parts = cleanDateStr.split('/')
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10)
+          const month = parseInt(parts[1], 10) - 1
+          const year = parseInt(parts[2], 10)
+          if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+            parsedDate = new Date(year, month, day)
+          }
+        } else {
+          // Fallback para parsing padrão
+          const d = new Date(row.dataNascimento)
+          if (!isNaN(d.getTime())) {
+            parsedDate = d
+          }
+        }
+      }
+
+      // 4. Resolver Temperatura (1 a 5, padrão 1)
+      let temp = 1
+      if (row.temperatura !== null && row.temperatura !== undefined) {
+        const val = Number(row.temperatura)
+        if (val >= 1 && val <= 5) {
+          temp = val
+        }
+      }
+
+      // 5. Resolver Etiquetas (Tags)
+      const tagIds: string[] = []
+      if (row.etiquetas && row.etiquetas.length > 0) {
+        for (const tagName of row.etiquetas) {
+          const key = tagName.toLowerCase().trim()
+          if (etiquetaMap.has(key)) {
+            tagIds.push(etiquetaMap.get(key)!)
+          } else {
+            // Criar etiqueta padrão do tipo "Outros"
+            const newTag = await prisma.etiqueta.create({
+              data: {
+                nome: tagName.trim(),
+                categoria: 'Importado',
+                cor: '#64748b' // Slate por padrão
+              }
+            })
+            tagIds.push(newTag.id)
+            etiquetaMap.set(key, newTag.id)
+          }
+        }
+      }
+
+      // 6. Verificar se o eleitor com este telefone já existe
+      const existingEleitor = await prisma.eleitor.findUnique({
+        where: { telefone: cleanPhone }
+      })
+
+      if (existingEleitor) {
+        // Atualizar eleitor existente
+        await prisma.eleitor.update({
+          where: { id: existingEleitor.id },
+          data: {
+            nomeCompleto: row.nome,
+            logradouro: row.logradouro || existingEleitor.logradouro,
+            numero: row.numero || existingEleitor.numero,
+            bairroId: rowBairroId,
+            cidadeId: rowCidadeId,
+            dataNascimento: parsedDate || existingEleitor.dataNascimento,
+            temperatura: temp,
+            isLider: row.isLider ?? existingEleitor.isLider
+          }
+        })
+
+        // Atualizar etiquetas N:N (apagar antigas e adicionar novas se informadas)
+        if (tagIds.length > 0) {
+          await prisma.eleitorEtiqueta.deleteMany({
+            where: { eleitorId: existingEleitor.id }
+          })
+          await prisma.eleitorEtiqueta.createMany({
+            data: tagIds.map(etiquetaId => ({
+              eleitorId: existingEleitor.id,
+              etiquetaId
+            }))
+          })
+        }
+
+        atualizados++
+      } else {
+        // Criar novo eleitor
+        const newEleitor = await prisma.eleitor.create({
+          data: {
+            nomeCompleto: row.nome,
+            telefone: cleanPhone,
+            logradouro: row.logradouro,
+            numero: row.numero,
+            bairroId: rowBairroId,
+            cidadeId: rowCidadeId,
+            dataNascimento: parsedDate,
+            temperatura: temp,
+            isLider: row.isLider ?? false,
+            etiquetas: {
+              create: tagIds.map(etiquetaId => ({
+                etiquetaId
+              }))
+            }
+          }
+        })
+        criados++
+      }
+    }
+
+    revalidatePath('/')
+    return { success: true, criados, atualizados }
+  } catch (error: any) {
+    console.error('Erro ao importar eleitores:', error)
+    return { success: false, error: `Falha ao importar planilha: ${error.message}` }
+  }
+}
+
+// ==========================================
+// CORRESPONDÊNCIA (MAIL MERGE) ACTIONS
+// ==========================================
+
+export async function getCorrespondenciaTemplates() {
+  try {
+    return await prisma.correspondenciaTemplate.findMany({
+      orderBy: { criadoEm: 'desc' },
+    })
+  } catch (error) {
+    console.error('Erro ao buscar templates de correspondência:', error)
+    return []
+  }
+}
+
+export async function createCorrespondenciaTemplate(data: {
+  titulo: string
+  categoria: string
+  tipo: string
+  conteudo?: string
+  cabecalho?: string
+  rodape?: string
+  arquivoNome?: string
+  arquivoBase64?: string
+}) {
+  try {
+    if (!data.titulo.trim()) {
+      return { success: false, error: 'O título do template é obrigatório.' }
+    }
+    const template = await prisma.correspondenciaTemplate.create({
+      data: {
+        titulo: data.titulo,
+        categoria: data.categoria || 'Geral',
+        tipo: data.tipo || 'PDF',
+        conteudo: data.conteudo || null,
+        cabecalho: data.cabecalho || null,
+        rodape: data.rodape || null,
+        arquivoNome: data.arquivoNome || null,
+        arquivoBase64: data.arquivoBase64 || null,
+      },
+    })
+    revalidatePath('/')
+    return { success: true, data: template }
+  } catch (error) {
+    console.error('Erro ao criar template de correspondência:', error)
+    return { success: false, error: 'Erro ao criar template de correspondência.' }
+  }
+}
+
+export async function updateCorrespondenciaTemplate(
+  id: string,
+  data: {
+    titulo: string
+    categoria: string
+    tipo: string
+    conteudo?: string
+    cabecalho?: string
+    rodape?: string
+    arquivoNome?: string
+    arquivoBase64?: string
+  }
+) {
+  try {
+    if (!data.titulo.trim()) {
+      return { success: false, error: 'O título do template é obrigatório.' }
+    }
+    await prisma.correspondenciaTemplate.update({
+      where: { id },
+      data: {
+        titulo: data.titulo,
+        categoria: data.categoria || 'Geral',
+        tipo: data.tipo || 'PDF',
+        conteudo: data.conteudo || null,
+        cabecalho: data.cabecalho || null,
+        rodape: data.rodape || null,
+        arquivoNome: data.arquivoNome || null,
+        arquivoBase64: data.arquivoBase64 || null,
+        cabecalho: data.cabecalho || null,
+        rodape: data.rodape || null,
+      },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao atualizar template de correspondência:', error)
+    return { success: false, error: 'Erro ao atualizar template.' }
+  }
+}
+
+export async function deleteCorrespondenciaTemplate(id: string) {
+  try {
+    await prisma.correspondenciaTemplate.delete({
+      where: { id },
+    })
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Erro ao excluir template de correspondência:', error)
+    return { success: false, error: 'Erro ao excluir template.' }
+  }
+}
